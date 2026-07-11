@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeShield — Analyse de sécurité de code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── TOKENS ─────────────────────────────────────────────── */
+  :root {
+    --ink:        #0F1117;
+    --ink-2:      #3D4250;
+    --ink-3:      #7B8194;
+    --border:     #E4E6ED;
+    --surface:    #F7F8FC;
+    --white:      #FFFFFF;
+    --shield:     #2563EB;
+    --shield-2:   #1D4ED8;
+    --shield-bg:  #EFF6FF;
+    --ok:         #16A34A;
+    --ok-bg:      #F0FDF4;
+    --warn:       #D97706;
+    --warn-bg:    #FFFBEB;
+    --danger:     #DC2626;
+    --danger-bg:  #FEF2F2;
+    --critical:   #7C3AED;
+    --critical-bg:#F5F3FF;
+    --radius:     10px;
+    --shadow:     0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+    --shadow-lg:  0 8px 32px rgba(0,0,0,.10);
+  }
+
+  /* ── RESET ───────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body { font-family: 'Inter', sans-serif; background: var(--surface); color: var(--ink); line-height: 1.6; }
+  button { cursor: pointer; font-family: inherit; }
+  a { text-decoration: none; color: inherit; }
+
+  /* ── NAV ─────────────────────────────────────────────────── */
+  nav {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    padding: 0 32px;
+    height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 18px; color: var(--ink);
+  }
+  .nav-brand svg { color: var(--shield); }
+  .nav-links { display: flex; align-items: center; gap: 8px; }
+  .nav-link {
+    padding: 6px 14px; border-radius: 6px;
+    font-size: 14px; font-weight: 500; color: var(--ink-2);
+    transition: background .15s;
+  }
+  .nav-link:hover { background: var(--surface); }
+  .nav-link.active { color: var(--shield); background: var(--shield-bg); }
+
+  /* ── HERO ────────────────────────────────────────────────── */
+  .hero {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 64px 32px 56px;
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 700; line-height: 1.15;
+    color: var(--ink); margin-bottom: 16px;
+    letter-spacing: -.02em;
+  }
+  .hero h1 span { color: var(--shield); }
+  .hero p {
+    font-size: 17px; color: var(--ink-2);
+    max-width: 520px; margin: 0 auto 36px;
+  }
+
+
+  /* ── LAYOUT PRINCIPAL ────────────────────────────────────── */
+  .app-layout {
+    max-width: 1280px; margin: 0 auto;
+    padding: 32px 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ── CARD ────────────────────────────────────────────────── */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title {
+    font-size: 14px; font-weight: 600; color: var(--ink);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title svg { color: var(--shield); }
+  .card-body { padding: 20px; }
+
+  /* ── ÉDITEUR ─────────────────────────────────────────────── */
+  .editor-controls {
+    display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .select-wrap { position: relative; flex: 1; min-width: 120px; }
+  .select-wrap select {
+    width: 100%; padding: 8px 32px 8px 12px;
+    border: 1px solid var(--border); border-radius: 7px;
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    color: var(--ink); background: var(--white);
+    appearance: none; cursor: pointer;
+    transition: border-color .15s;
+  }
+  .select-wrap select:focus { outline: none; border-color: var(--shield); }
+  .select-wrap::after {
+    content: '▾'; position: absolute; right: 10px; top: 50%;
+    transform: translateY(-50%); pointer-events: none;
+    font-size: 12px; color: var(--ink-3);
+  }
+
+  .editor-wrap {
+    position: relative;
+    border: 1px solid var(--border); border-radius: 7px;
+    overflow: hidden; background: #FAFBFE;
+  }
+  .editor-wrap:focus-within { border-color: var(--shield); }
+  .line-numbers {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 40px; padding: 14px 0;
+    background: var(--surface); border-right: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--ink-3); line-height: 1.6;
+    text-align: right; padding-right: 8px;
+    pointer-events: none; overflow: hidden;
+    user-select: none;
+  }
+  #code-editor {
+    width: 100%; min-height: 280px;
+    padding: 14px 14px 14px 54px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    line-height: 1.6; color: var(--ink);
+    background: transparent; border: none; resize: vertical;
+    outline: none; tab-size: 4;
+  }
+  .editor-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 14px;
+  }
+
+  /* ── BOUTON ANALYSER ─────────────────────────────────────── */
+  .btn-analyse {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--shield); color: var(--white);
+    border: none; border-radius: 8px;
+    padding: 10px 24px; font-size: 14px; font-weight: 600;
+    transition: background .15s, transform .1s, box-shadow .15s;
+    box-shadow: 0 2px 8px rgba(37,99,235,.25);
+  }
+  .btn-analyse:hover { background: var(--shield-2); box-shadow: 0 4px 16px rgba(37,99,235,.35); }
+  .btn-analyse:active { transform: scale(.98); }
+  .btn-analyse:disabled { background: var(--ink-3); box-shadow: none; cursor: not-allowed; }
+  .btn-analyse .spinner {
+    width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin .7s linear infinite; display: none;
+  }
+  .btn-analyse.loading .spinner { display: block; }
+  .btn-analyse.loading .btn-text { opacity: .7; }
+
+  /* ── MODE BADGE ──────────────────────────────────────────── */
+
+  /* ── RÉSULTATS ───────────────────────────────────────────── */
+  .result-placeholder {
+    padding: 48px 20px; text-align: center;
+    color: var(--ink-3);
+  }
+  .result-placeholder svg { margin-bottom: 12px; opacity: .4; }
+  .result-placeholder p { font-size: 14px; }
+
+  /* Score */
+  .score-section {
+    display: flex; align-items: center; gap: 20px;
+    padding: 20px; border-bottom: 1px solid var(--border);
+  }
+  .score-circle {
+    width: 72px; height: 72px; border-radius: 50%;
+    border: 4px solid; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700;
+  }
+  .score-circle.high { border-color: var(--ok); color: var(--ok); }
+  .score-circle.med  { border-color: var(--warn); color: var(--warn); }
+  .score-circle.low  { border-color: var(--danger); color: var(--danger); }
+  .score-meta h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .score-meta p  { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+
+  /* Compteurs sévérité */
+  .sev-counts {
+    display: grid; grid-template-columns: repeat(4,1fr); gap: 8px;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+  }
+  .sev-pill {
+    border-radius: 7px; padding: 8px 6px; text-align: center;
+  }
+  .sev-pill .nb { font-size: 20px; font-weight: 700; }
+  .sev-pill .lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+  .sev-pill.critique { background: var(--critical-bg); color: var(--critical); }
+  .sev-pill.haute    { background: var(--danger-bg);   color: var(--danger); }
+  .sev-pill.moyenne  { background: var(--warn-bg);     color: var(--warn); }
+  .sev-pill.basse    { background: var(--ok-bg);       color: var(--ok); }
+
+  /* Résumé */
+  .resume-box {
+    margin: 14px 20px;
+    background: var(--surface); border-left: 3px solid var(--shield);
+    border-radius: 0 6px 6px 0; padding: 10px 14px;
+    font-size: 13px; color: var(--ink-2); line-height: 1.6;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex; border-bottom: 1px solid var(--border);
+    padding: 0 20px; gap: 4px;
+  }
+  .tab {
+    padding: 10px 14px; font-size: 13px; font-weight: 500;
+    color: var(--ink-3); border: none; background: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+  }
+  .tab.active { color: var(--shield); border-bottom-color: var(--shield); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Vulnérabilités */
+  .vuln-list { padding: 12px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .vuln-item {
+    border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; transition: box-shadow .15s;
+  }
+  .vuln-item:hover { box-shadow: var(--shadow); }
+  .vuln-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; cursor: pointer;
+    background: var(--white);
+  }
+  .sev-badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; padding: 2px 8px; border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .sev-badge.critique { background: var(--critical-bg); color: var(--critical); }
+  .sev-badge.haute    { background: var(--danger-bg);   color: var(--danger); }
+  .sev-badge.moyenne  { background: var(--warn-bg);     color: var(--warn); }
+  .sev-badge.basse    { background: var(--ok-bg);       color: var(--ok); }
+  .sev-badge.info     { background: var(--surface);     color: var(--ink-3); }
+  .vuln-title { font-size: 13px; font-weight: 500; flex: 1; }
+  .vuln-line  { font-size: 12px; color: var(--ink-3); font-family: 'JetBrains Mono', monospace; }
+  .vuln-chevron { color: var(--ink-3); font-size: 11px; transition: transform .2s; }
+  .vuln-item.open .vuln-chevron { transform: rotate(180deg); }
+  .vuln-body {
+    display: none; padding: 12px 14px;
+    border-top: 1px solid var(--border); background: var(--surface);
+    font-size: 13px; color: var(--ink-2);
+  }
+  .vuln-item.open .vuln-body { display: block; }
+  .vuln-body-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .vuln-body-row:last-child { margin-bottom: 0; }
+  .vuln-body-label { font-weight: 600; color: var(--ink); min-width: 90px; flex-shrink: 0; }
+  .vuln-suggestion {
+    background: var(--shield-bg); color: var(--shield);
+    border-radius: 5px; padding: 8px 10px; margin-top: 8px;
+    font-size: 12px; line-height: 1.5;
+  }
+  .vuln-suggestion::before { content: '💡 '; }
+
+  /* Analyse structurelle */
+  .struct-grid {
+    padding: 16px 20px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .struct-item {
+    background: var(--surface); border-radius: 7px; padding: 12px;
+  }
+  .struct-item .s-label { font-size: 11px; color: var(--ink-3); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+  .struct-item .s-value { font-size: 18px; font-weight: 700; color: var(--ink); margin-top: 4px; }
+  .struct-item .s-value.mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .fn-danger-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .fn-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: var(--danger-bg); color: var(--danger);
+    padding: 2px 7px; border-radius: 4px;
+  }
+
+  /* CVE */
+  .cve-list { padding: 12px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .cve-item {
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
+    background: var(--white);
+  }
+  .cve-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .cve-id { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--shield); }
+  .cve-score { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .cve-desc { font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+  .cve-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .cve-ref { font-size: 11px; color: var(--shield); text-decoration: underline; }
+
+  /* Export */
+  .export-bar {
+    display: flex; gap: 8px; padding: 14px 20px;
+    border-top: 1px solid var(--border);
+  }
+  .btn-export {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 16px; border-radius: 7px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--white); color: var(--ink-2);
+    transition: all .15s;
+  }
+  .btn-export:hover { border-color: var(--shield); color: var(--shield); background: var(--shield-bg); }
+
+  /* Historique */
+  .history-list { padding: 12px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .history-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--white); cursor: pointer; transition: all .15s;
+  }
+  .history-item:hover { border-color: var(--shield); box-shadow: var(--shadow); }
+  .history-lang {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+    background: var(--shield-bg); color: var(--shield);
+  }
+  .history-name { font-size: 13px; font-weight: 500; flex: 1; }
+  .history-meta { font-size: 12px; color: var(--ink-3); }
+  .history-score { font-size: 13px; font-weight: 700; }
+  .history-score.high { color: var(--ok); }
+  .history-score.med  { color: var(--warn); }
+  .history-score.low  { color: var(--danger); }
+  .history-empty { padding: 32px; text-align: center; color: var(--ink-3); font-size: 14px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--ink); color: white;
+    padding: 12px 20px; border-radius: 8px;
+    font-size: 14px; font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    transform: translateY(80px); opacity: 0;
+    transition: transform .3s, opacity .3s;
+    z-index: 999;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { background: var(--danger); }
+  .toast.success { background: var(--ok); }
+
+  /* Loading overlay */
+  .loading-overlay {
+    display: none; position: absolute; inset: 0;
+    background: rgba(255,255,255,.85); border-radius: var(--radius);
+    align-items: center; justify-content: center; flex-direction: column; gap: 12px;
+    z-index: 10;
+  }
+  .loading-overlay.show { display: flex; }
+  .big-spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border);
+    border-top-color: var(--shield); border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  .loading-text { font-size: 14px; font-weight: 500; color: var(--ink-2); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── BOUTON IA ───────────────────────────────────────────── */
+  .btn-ia {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); color: var(--ink-3);
+    border: 1px dashed var(--border); border-radius: 8px;
+    padding: 10px 20px; font-size: 14px; font-weight: 500;
+    cursor: not-allowed; opacity: .7; position: relative;
+  }
+  .btn-ia-badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    background: var(--warn-bg); color: var(--warn);
+    padding: 2px 6px; border-radius: 4px; letter-spacing: .04em;
+  }
+  .ia-tooltip {
+    display: none; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink); color: white;
+    font-size: 12px; padding: 8px 12px; border-radius: 6px;
+    width: 280px; text-align: center; line-height: 1.5;
+    white-space: normal; z-index: 10;
+  }
+  .btn-ia:hover .ia-tooltip { display: block; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .app-layout { grid-template-columns: 1fr; }
+    }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+      <polyline points="9 12 11 14 15 10"/>
+    </svg>
+    CodeShield
+  </div>
+  <div class="nav-links">
+    <a href="#analyser" class="nav-link active" onclick="setNav(this)">Analyser</a>
+    <a href="#historique" class="nav-link" onclick="setNav(this); showHistory()">Historique</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>Détectez les vulnérabilités<br>avant qu'elles deviennent des <span>incidents</span></h1>
+  <p>Analyse statique de code source avec corrélation CVE en temps réel. Obtenez un rapport de sécurité détaillé en quelques secondes.</p>
+</div>
+
+<!-- APP -->
+<div class="app-layout" id="analyser">
+
+  <!-- ÉDITEUR -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Code source
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="editor-controls">
+        <div class="select-wrap">
+          <select id="sel-lang">
+            <option value="c">C</option>
+            <option value="python">Python</option>
+          </select>
+        </div>
+        <div class="select-wrap">
+          <select id="sel-mode" onchange="afficherDisclaimerMode()">
+            <option value="classique">Mode classique</option>
+            <option value="avance">Mode avancé (CVE)</option>
+          </select>
+        </div>
+        <div id="disclaimer-avance" style="display:none;margin-top:8px;padding:8px 12px;background:#FFFBEB;border:1px solid #D97706;border-radius:6px;font-size:12px;color:#92400E">⚠️ Le mode avancé corrèle les vulnérabilités avec la base CVE ANSSI. La première analyse peut prendre plusieurs minutes.</div>
+        <div style="display:none">
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <input type="file" id="file-input" accept=".c,.py" style="display:none" onchange="importerFichier(event)">
+        <button onclick="document.getElementById('file-input').click()" style="
+          display:inline-flex;align-items:center;gap:6px;
+          padding:6px 14px;border:1px solid var(--border);border-radius:6px;
+          background:var(--white);font-size:13px;font-weight:500;
+          color:var(--ink-2);cursor:pointer;transition:all .15s;
+        " onmouseover="this.style.borderColor='var(--shield)';this.style.color='var(--shield)'"
+           onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--ink-2)'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Importer un fichier
+        </button>
+        <span id="file-name" style="font-size:12px;color:var(--ink-3);margin-left:8px"></span>
+      </div>
+
+      <div class="editor-wrap">
+        <div class="line-numbers" id="line-numbers">1</div>
+        <textarea id="code-editor" spellcheck="false"
+          placeholder="Collez votre code ici…"
+          oninput="updateLineNumbers()"></textarea>
+      </div>
+
+      <div class="editor-footer">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-analyse" id="btn-analyse" onclick="lancerAnalyse()">
+            <div class="spinner"></div>
+            <svg class="btn-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/></svg>
+            <span class="btn-text">Analyser</span>
+          </button>
+          <button class="btn-ia" title="">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+            Analyse IA
+            <span class="btn-ia-badge">Bientôt</span>
+            <div class="ia-tooltip">
+              Infrastructure prête — modèle Mistral retiré pour performances insuffisantes. Disponible sur serveur GPU dédié.
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RÉSULTATS -->
+  <div class="card" style="position:relative" id="result-card">
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="big-spinner"></div>
+      <div class="loading-text">Analyse en cours…</div>
+    </div>
+    <div class="card-header">
+      <div class="card-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Rapport
+      </div>
+      <div id="rapport-id-display" style="font-size:11px;color:var(--ink-3);font-family:'JetBrains Mono',monospace"></div>
+    </div>
+
+    <!-- Placeholder -->
+    <div class="result-placeholder" id="result-placeholder">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+      </svg>
+      <p>Soumettez du code pour obtenir<br>votre rapport de sécurité</p>
+    </div>
+
+    <!-- Résultat -->
+    <div id="result-content" style="display:none">
+      <!-- Score -->
+      <div class="score-section" id="score-section"></div>
+      <!-- Counts -->
+      <div class="sev-counts" id="sev-counts"></div>
+      <!-- Résumé -->
+      <div class="resume-box" id="resume-box"></div>
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('vulns', this)">Vulnérabilités <span id="vuln-count-badge"></span></button>
+        <button class="tab" onclick="switchTab('struct', this)">Structure</button>
+        <button class="tab" id="tab-cve" style="display:none" onclick="switchTab('cve', this)" style="display:none">CVE corrélées <span id="cve-count-badge"></span></button>
+      </div>
+      <div class="tab-panel active" id="panel-vulns">
+        <div class="vuln-list" id="vuln-list"></div>
+      </div>
+      <div class="tab-panel" id="panel-struct">
+        <div class="struct-grid" id="struct-grid"></div>
+      </div>
+      <div class="tab-panel" id="panel-cve">
+        <div class="cve-list" id="cve-list"></div>
+      </div>
+      <!-- Export -->
+      <div class="export-bar">
+        <button class="btn-export" onclick="exporterJSON()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exporter JSON
+        </button>
+        <button class="btn-export" onclick="exporterPDF()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Télécharger PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORIQUE (caché par défaut) -->
+<div id="historique" style="display:none; max-width:1280px; margin:0 auto; padding:0 24px 32px">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Historique des analyses
+      </div>
+      <button class="btn-export" onclick="chargerHistorique()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+        Actualiser
+      </button>
+    </div>
+    <div style="padding:10px 20px;background:#EFF6FF;border-bottom:1px solid #E4E6ED;font-size:12px;color:#1D4ED8">
+      ℹ️ L'historique est sauvegardé dans le cache de votre navigateur. Ne supprimez pas le cache pour conserver vos analyses.
+    </div>
+    <div id="history-content">
+      <div class="history-empty">Chargement…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let currentRapportId = null;
+
+// ── UTILITAIRES ───────────────────────────────────────────
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+function setNav(el) {
+  document.querySelectorAll('.nav-link').forEach(l => {
+    l.classList.remove('active');
+  });
+  el.classList.add('active');
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.remove('active');
+  });
+  btn.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ── ÉDITEUR ───────────────────────────────────────────────
+function updateLineNumbers() {
+  const lines = document.getElementById('code-editor').value.split('\n').length;
+  document.getElementById('line-numbers').innerHTML =
+    Array.from({length: lines}, (_, i) => i + 1).join('<br>');
+}
+
+
+
+// ── ANALYSE ───────────────────────────────────────────────
+function detecterLangage(code) {
+  // Indicateurs C
+  const signesC = [
+    /^\s*#include\s*[<"]/m,
+    /^\s*#define\s+/m,
+    /int\s+main\s*\(/,
+    /printf\s*\(/,
+    /char\s+\w+\[/,
+    /void\s+\w+\s*\(/,
+    /(malloc|free|sizeof)\s*\(/,
+  ];
+
+  // Indicateurs Python
+  const signesPython = [
+    /^\s*def\s+\w+\s*\(/m,
+    /^\s*import\s+\w+/m,
+    /^\s*from\s+\w+\s+import/m,
+    /^\s*class\s+\w+/m,
+    /^\s*print\s*\(/m,
+    /:\s*$/m,
+    /^\s*elif\s+/m,
+  ];
+
+  const scoreC = signesC.filter(r => r.test(code)).length;
+  const scorePy = signesPython.filter(r => r.test(code)).length;
+  
+  if (scoreC > scorePy) return 'c';
+  if (scorePy > scoreC) return 'python';
+  return null; // indéterminé
+}
+
+async function lancerAnalyse() {
+  const code = document.getElementById('code-editor').value.trim();
+  if (!code) { toast('Veuillez saisir du code à analyser', 'error'); return; }
+
+  // Vérification du langage
+  const langageSelectionne = document.getElementById('sel-lang').value;
+  const langageDetecte = detecterLangage(code);
+  if (langageDetecte === null) {
+    toast('⚠️ Le code ne semble pas être du ' + (langageSelectionne === 'c' ? 'C' : 'Python') + '. Vérifiez le langage sélectionné.', 'error');
+    return;
+  }
+  if (langageDetecte !== langageSelectionne) {
+    const noms = { c: 'C', python: 'Python' };
+    toast(`⚠️ Ce code ressemble à du ${noms[langageDetecte]}, pas du ${noms[langageSelectionne]}`, 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-analyse');
+  btn.classList.add('loading'); btn.disabled = true;
+  document.getElementById('loading-overlay').classList.add('show');
+  document.getElementById('result-placeholder').style.display = 'none';
+  document.getElementById('result-content').style.display = 'none';
+  const nomFichier = 'code.' + document.getElementById('sel-lang').value;
+    'code.' + document.getElementById('sel-lang').value;
+
+  try {
+    const res = await fetch(`${API}/api/analyse/`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        code,
+        langage: document.getElementById('sel-lang').value,
+        mode: document.getElementById('sel-mode').value,
+        nom_fichier: nomFichier,
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const rapport = await res.json();
+    afficherRapport(rapport);
+    currentRapportId = rapport.id;
+    sauvegarderDansHistorique(rapport);
+    toast('Analyse terminée', 'success');
+  } catch(e) {
+    toast('Erreur : ' + e.message, 'error');
+    document.getElementById('result-placeholder').style.display = '';
+  } finally {
+    btn.classList.remove('loading'); btn.disabled = false;
+    document.getElementById('loading-overlay').classList.remove('show');
+  }
+}
+
+// ── AFFICHAGE RAPPORT ─────────────────────────────────────
+function scoreClass(s) {
+  if (s >= 75) return 'high';
+  if (s >= 40) return 'med';
+  return 'low';
+}
+
+function afficherRapport(r) {
+  document.getElementById('rapport-id-display').textContent = r.id.slice(0,8) + '…';
+
+  // Score
+  const sc = scoreClass(r.score_securite);
+  document.getElementById('score-section').innerHTML = `
+    <div class="score-circle ${sc}">${r.score_securite}</div>
+    <div class="score-meta">
+      <h3>${r.nom_fichier} · ${r.langage.toUpperCase()} · ${r.mode}</h3>
+      <p>${r.date_analyse} · ${r.duree_ms} ms · ${r.nb_vulnerabilites} problème(s) détecté(s)</p>
+    </div>`;
+
+  // Sévérités
+  document.getElementById('sev-counts').innerHTML = `
+    <div class="sev-pill critique"><div class="nb">${r.nb_critique}</div><div class="lbl">Critique</div></div>
+    <div class="sev-pill haute"><div class="nb">${r.nb_haute}</div><div class="lbl">Haute</div></div>
+    <div class="sev-pill moyenne"><div class="nb">${r.nb_moyenne}</div><div class="lbl">Moyenne</div></div>
+    <div class="sev-pill basse"><div class="nb">${r.nb_basse}</div><div class="lbl">Basse</div></div>`;
+
+  // Résumé
+  document.getElementById('resume-box').textContent = r.resume;
+
+  // Badge tabs
+  document.getElementById('vuln-count-badge').textContent = r.nb_vulnerabilites > 0 ? `(${r.nb_vulnerabilites})` : '';
+
+  // Vulnérabilités
+  const vl = document.getElementById('vuln-list');
+  if (r.vulnerabilites.length === 0) {
+    vl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ok);font-size:14px">✓ Aucune vulnérabilité détectée</div>';
+  } else {
+    vl.innerHTML = r.vulnerabilites.map((v, i) => `
+      <div class="vuln-item" id="vuln-${i}">
+        <div class="vuln-header" onclick="toggleVuln(${i})">
+          <span class="sev-badge ${v.severite}">${v.severite}</span>
+          <span class="vuln-title">${escHtml(v.titre)}</span>
+          ${v.ligne ? `<span class="vuln-line">L.${v.ligne}</span>` : ''}
+          <span class="vuln-chevron">▾</span>
+        </div>
+        <div class="vuln-body">
+          <div class="vuln-body-row"><span class="vuln-body-label">Description</span><span>${escHtml(v.description)}</span></div>
+          <div class="vuln-body-row"><span class="vuln-body-label">Catégorie</span><span>${escHtml(v.categorie)}</span></div>
+          <div class="vuln-body-row"><span class="vuln-body-label">Outil</span><span>${escHtml(v.outil)}</span></div>
+          ${v.cve_ids && v.cve_ids.length ? `<div class="vuln-body-row"><span class="vuln-body-label">CVE</span><span>${v.cve_ids.join(', ')}</span></div>` : ''}
+          ${v.cvss_score ? `<div class="vuln-body-row"><span class="vuln-body-label">CVSS</span><span>${v.cvss_score}</span></div>` : ''}
+          ${v.suggestion ? `<div class="vuln-suggestion">${escHtml(v.suggestion)}</div>` : ''}
+        </div>
+      </div>`).join('');
+  }
+
+  // Structure
+  const st = r.analyse_structurelle;
+  document.getElementById('struct-grid').innerHTML = `
+    <div class="struct-item"><div class="s-label">Lignes de code</div><div class="s-value">${st.nb_lignes}</div></div>
+    <div class="struct-item"><div class="s-label">Fonctions</div><div class="s-value">${st.nb_fonctions}</div></div>
+    <div class="struct-item"><div class="s-label">Commentaires</div><div class="s-value">${st.nb_commentaires}</div></div>
+    <div class="struct-item"><div class="s-label">Complexité</div><div class="s-value">${st.complexite_estimee}</div></div>
+    <div class="struct-item" style="grid-column:1/-1">
+      <div class="s-label">Imports / Includes</div>
+      <div class="s-value mono">${st.imports_detectes.length ? st.imports_detectes.join(', ') : '—'}</div>
+    </div>
+    <div class="struct-item" style="grid-column:1/-1">
+      <div class="s-label">Fonctions dangereuses détectées</div>
+      <div class="fn-danger-list">
+        ${st.fonctions_dangereuses.length
+          ? st.fonctions_dangereuses.map(f => `<span class="fn-tag">${f}()</span>`).join('')
+          : '<span style="font-size:13px;color:var(--ok)">✓ Aucune</span>'}
+      </div>
+    </div>`;
+
+  document.getElementById('tab-cve').style.display = 'none';
+
+  document.getElementById('result-content').style.display = '';
+}
+
+function toggleVuln(i) {
+  const el = document.getElementById('vuln-' + i);
+  el.classList.toggle('open');
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// ── EXPORT ────────────────────────────────────────────────
+async function exporterJSON() {
+  if (!currentRapportId) {
+    toast('Aucun rapport à exporter', 'error');
+    return;
+  }
+  window.open(`${API}/api/rapports/${currentRapportId}/json`, '_blank');
+}
+
+async function exporterPDF() {
+  if (!currentRapportId) { toast('Aucun rapport à exporter', 'error'); return; }
+  toast('Génération du PDF…');
+  window.open(`${API}/api/rapports/${currentRapportId}/pdf`, '_blank');
+}
+
+// ── HISTORIQUE ────────────────────────────────────────────
+function showHistory() {
+  document.getElementById('analyser').style.display = 'none';
+  document.getElementById('historique').style.display = '';
+  chargerHistorique();
+}
+
+function showAnalyser() {
+  document.getElementById('historique').style.display = 'none';
+  document.getElementById('analyser').style.display = '';
+}
+
+document.querySelectorAll('.nav-link').forEach(l => {
+  l.addEventListener('click', () => {
+    if (l.href.includes('analyser')) showAnalyser();
+  });
+});
+
+// ── HISTORIQUE (localStorage) ────────────────────────────
+const HISTORY_KEY = 'codeshield_historique';
+const MAX_HISTORY = 20;
+
+function sauvegarderDansHistorique(rapport) {
+  // Sauvegarde un résumé du rapport dans le cache du navigateur
+  const historique = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  const entree = {
+    id: rapport.id,
+    nom_fichier: rapport.nom_fichier,
+    langage: rapport.langage,
+    mode: rapport.mode,
+    date_analyse: rapport.date_analyse,
+    score_securite: rapport.score_securite,
+    nb_vulnerabilites: rapport.nb_vulnerabilites,
+    resume: rapport.resume,
+    vulnerabilites: rapport.vulnerabilites,
+    analyse_structurelle: rapport.analyse_structurelle,
+    cve_correlees: rapport.cve_correlees || [],
+  };
+  // Ajouter en tête de liste et limiter à MAX_HISTORY entrées
+  historique.unshift(entree);
+  if (historique.length > MAX_HISTORY) historique.pop();
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(historique));
+}
+
+function chargerHistorique() {
+  const el = document.getElementById('history-content');
+  const historique = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+
+  if (historique.length === 0) {
+    el.innerHTML = '<div class="history-empty">Aucune analyse dans votre historique</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="history-list">' + historique.map((r, i) => `
+    <div class="history-item" onclick="chargerRapportLocal(${i})">
+      <span class="history-lang">${r.langage.toUpperCase()}</span>
+      <span class="history-name">${escHtml(r.nom_fichier)}</span>
+      <span class="history-meta">${r.date_analyse ? r.date_analyse.slice(0,16) : ''} · ${r.mode}</span>
+      <span class="history-score ${scoreClass(r.score_securite)}">${r.score_securite}/100</span>
+    </div>`).join('') + '</div>';
+}
+
+function chargerRapportLocal(index) {
+  const historique = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  const rapport = historique[index];
+  if (!rapport) return;
+  currentRapportId = rapport.id;
+  showAnalyser();
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelector('.nav-link[href="#analyser"]').classList.add('active');
+  document.getElementById('result-placeholder').style.display = 'none';
+  afficherRapport(rapport);
+  toast('Rapport chargé depuis votre historique');
+}
+
+// ── DISCLAIMER MODE ──────────────────────────────────────
+function afficherDisclaimerMode() {
+  const mode = document.getElementById('sel-mode').value;
+  const disc = document.getElementById('disclaimer-avance');
+  if (disc) disc.style.display = mode === 'avance' ? 'block' : 'none';
+}
+
+// ── IMPORT FICHIER ────────────────────────────────────────
+function importerFichier(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Vérifier l'extension
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'c' && ext !== 'py') {
+    toast('Seuls les fichiers .c et .py sont acceptés', 'error');
+    return;
+  }
+
+  // Mettre à jour le sélecteur de langage automatiquement
+  const lang = ext === 'c' ? 'c' : 'python';
+  document.getElementById('sel-lang').value = lang;
+
+  // Lire le contenu du fichier
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('code-editor').value = e.target.result;
+    updateLineNumbers();
+    document.getElementById('file-name').textContent = file.name;
+    toast(`Fichier ${file.name} importé`);
+  };
+  reader.readAsText(file);
+
+  // Réinitialiser l'input pour permettre de reimporter le même fichier
+  event.target.value = '';
+}
+
+// ── INIT ──────────────────────────────────────────────────
+updateLineNumbers();
+</script>
+</body>
+</html>

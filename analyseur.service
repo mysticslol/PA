@@ -1,0 +1,21 @@
+[Unit]
+Description=Analyseur de code - Backend FastAPI
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/analyseur
+ExecStart=/opt/analyseur/venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 2 \
+    --loop asyncio
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
