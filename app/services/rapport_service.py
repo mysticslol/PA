@@ -6,6 +6,7 @@ REPORTS_DIR = "./reports"
 
 
 def couleur_score(score: int) -> str:
+    # Retourne une couleur hex selon le score (vert, orange ou rouge)
     if score >= 80:
         return "#1D9E75"
     if score >= 50:
@@ -14,6 +15,7 @@ def couleur_score(score: int) -> str:
 
 
 def couleur_severite(severite: str) -> str:
+    # Retourne la couleur associée à chaque niveau de sévérité
     couleurs = {
         "critique": "#E24B4A",
         "haute":    "#D85A30",
@@ -25,6 +27,7 @@ def couleur_severite(severite: str) -> str:
 
 
 def generer_html(rapport: RapportAnalyse) -> str:
+    # Génère le contenu HTML du rapport pour l'export PDF
     score_color = couleur_score(rapport.score_securite)
 
     lignes_tableau = ""
@@ -79,6 +82,7 @@ def generer_html(rapport: RapportAnalyse) -> str:
 
 
 def sauvegarder_json(rapport: RapportAnalyse) -> str:
+    # Sauvegarde un rapport simplifié en JSON (score, résumé, corrections)
     os.makedirs(REPORTS_DIR, exist_ok=True)
     chemin = os.path.join(REPORTS_DIR, f"{rapport.id}.json")
 
@@ -106,6 +110,7 @@ def sauvegarder_json(rapport: RapportAnalyse) -> str:
 
 
 def sauvegarder_html(rapport: RapportAnalyse) -> str:
+    # Sauvegarde le rapport au format HTML (utilisé comme source pour le PDF)
     os.makedirs(REPORTS_DIR, exist_ok=True)
     chemin = os.path.join(REPORTS_DIR, f"{rapport.id}.html")
 
@@ -116,6 +121,7 @@ def sauvegarder_html(rapport: RapportAnalyse) -> str:
 
 
 def generer_pdf(rapport_id: str) -> str:
+    # Génère un PDF à partir du HTML sauvegardé via WeasyPrint
     from weasyprint import HTML
 
     chemin_html = os.path.join(REPORTS_DIR, f"{rapport_id}.html")

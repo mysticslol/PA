@@ -8,6 +8,7 @@ from app.routers import analyse, rapports
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialise la base de données au démarrage du serveur
     await init_db()
     yield
 
@@ -32,4 +33,5 @@ app.include_router(rapports.router, prefix="/api/rapports", tags=["Rapports"])
 
 @app.get("/api/health")
 async def health():
+    # Endpoint de vérification — permet de savoir si le serveur est en ligne
     return {"status": "ok", "version": "1.0.0"}

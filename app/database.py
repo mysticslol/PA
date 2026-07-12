@@ -32,10 +32,12 @@ class RapportDB(Base):
 
 
 async def init_db():
+    # Crée les tables si elles n'existent pas encore
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_db():
+    # Fournit une session à chaque requête et la ferme automatiquement après
     async with SessionLocal() as session:
         yield session

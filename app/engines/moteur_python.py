@@ -51,6 +51,7 @@ SUGGESTIONS = {
 
 
 def categorie_bandit(test_id: str) -> str:
+    # Retourne la catégorie de sécurité selon le numéro de règle bandit
     num = int(test_id[1:]) if test_id[1:].isdigit() else 0
 
     if 100 <= num <= 199:
@@ -72,6 +73,7 @@ def categorie_bandit(test_id: str) -> str:
 
 
 async def lancer_bandit(chemin: str) -> List[Vulnerabilite]:
+    # Lance bandit sur le fichier Python et retourne les vulnérabilités détectées
     vulns = []
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -111,6 +113,7 @@ async def lancer_bandit(chemin: str) -> List[Vulnerabilite]:
 
 
 async def lancer_pyflakes(chemin: str) -> List[Vulnerabilite]:
+    # Lance pyflakes pour détecter les problèmes de qualité (imports inutilisés, etc.)
     vulns = []
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -145,6 +148,7 @@ async def lancer_pyflakes(chemin: str) -> List[Vulnerabilite]:
 
 
 def analyser_structure(code: str) -> AnalyseStructurelle:
+    # Analyse la structure du code Python sans l'exécuter (regex sur le texte brut)
     lignes = code.splitlines()
     nb     = len(lignes)
 
@@ -177,6 +181,7 @@ def analyser_structure(code: str) -> AnalyseStructurelle:
 
 
 async def analyser_python(code: str) -> Tuple[List[Vulnerabilite], AnalyseStructurelle]:
+    # Point d'entrée principal — lance bandit et pyflakes en parallèle
     structure = analyser_structure(code)
 
     with tempfile.NamedTemporaryFile(

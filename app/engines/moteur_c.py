@@ -39,6 +39,7 @@ SUGGESTIONS_FLAWFINDER = {
 
 
 def severite_cppcheck(niveau: str) -> SeveriteEnum:
+    # Convertit le niveau cppcheck en notre propre échelle de sévérité
     niveaux = {
         "error":       SeveriteEnum.HAUTE,
         "warning":     SeveriteEnum.MOYENNE,
@@ -51,6 +52,7 @@ def severite_cppcheck(niveau: str) -> SeveriteEnum:
 
 
 def severite_flawfinder(niveau: int) -> SeveriteEnum:
+    # Convertit le niveau flawfinder (0-5) en notre propre échelle de sévérité
     if niveau >= 4:
         return SeveriteEnum.CRITIQUE
     if niveau >= 3:
@@ -63,6 +65,7 @@ def severite_flawfinder(niveau: int) -> SeveriteEnum:
 
 
 def categorie_cppcheck(eid: str) -> str:
+    # Détermine la catégorie de faille selon l'identifiant d'erreur cppcheck
     if any(k in eid for k in ("buffer", "Array", "Bounds")):
         return "Débordement de tampon"
     if any(k in eid for k in ("memory", "leak", "free", "alloc")):
@@ -77,6 +80,7 @@ def categorie_cppcheck(eid: str) -> str:
 
 
 def suggestion_cppcheck(eid: str) -> str:
+    # Retourne un conseil de correction selon le type d'erreur détecté
     for cle, conseil in SUGGESTIONS_CPPCHECK.items():
         if cle in eid:
             return conseil
@@ -84,6 +88,7 @@ def suggestion_cppcheck(eid: str) -> str:
 
 
 def suggestion_flawfinder(fonction: str) -> str:
+    # Retourne un conseil de correction selon la fonction dangereuse détectée
     for cle, conseil in SUGGESTIONS_FLAWFINDER.items():
         if cle.lower() in fonction.lower():
             return conseil
@@ -91,6 +96,7 @@ def suggestion_flawfinder(fonction: str) -> str:
 
 
 async def lancer_cppcheck(chemin: str) -> List[Vulnerabilite]:
+    # Lance cppcheck sur le fichier C et retourne les erreurs détectées
     vulns = []
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -141,6 +147,7 @@ async def lancer_cppcheck(chemin: str) -> List[Vulnerabilite]:
 
 
 async def lancer_flawfinder(chemin: str) -> List[Vulnerabilite]:
+    # Lance flawfinder sur le fichier C et retourne les fonctions dangereuses détectées
     vulns = []
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -184,6 +191,7 @@ async def lancer_flawfinder(chemin: str) -> List[Vulnerabilite]:
 
 
 def analyser_structure(code: str) -> AnalyseStructurelle:
+    # Analyse la structure du code C sans l'exécuter (regex sur le texte brut)
     lignes = code.splitlines()
     nb     = len(lignes)
 
@@ -222,6 +230,7 @@ def analyser_structure(code: str) -> AnalyseStructurelle:
 
 
 async def analyser_c(code: str) -> Tuple[List[Vulnerabilite], AnalyseStructurelle]:
+    # Point d'entrée principal — lance cppcheck et flawfinder en parallèle
     structure = analyser_structure(code)
 
     with tempfile.NamedTemporaryFile(

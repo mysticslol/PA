@@ -17,6 +17,7 @@ async def lister_rapports(
     limite: int = 20,
     db: AsyncSession = Depends(get_db)
 ):
+    # Retourne les dernières analyses enregistrées en base
     resultat = await db.execute(
         select(RapportDB)
         .order_by(desc(RapportDB.date_analyse))
@@ -45,6 +46,7 @@ async def obtenir_rapport(
     rapport_id: str,
     db: AsyncSession = Depends(get_db)
 ):
+    # Retourne le détail complet d'un rapport par son identifiant
     resultat = await db.execute(
         select(RapportDB).where(RapportDB.id == rapport_id)
     )
@@ -74,6 +76,7 @@ async def obtenir_rapport(
 
 @router.get("/{rapport_id}/json")
 async def telecharger_json(rapport_id: str):
+    # Télécharge le rapport au format JSON simplifié
     chemin = os.path.join(REPORTS_DIR, f"{rapport_id}.json")
 
     if not os.path.isfile(chemin):
@@ -88,6 +91,7 @@ async def telecharger_json(rapport_id: str):
 
 @router.get("/{rapport_id}/pdf")
 async def telecharger_pdf(rapport_id: str):
+    # Génère le PDF si nécessaire puis le télécharge
     chemin_pdf = os.path.join(REPORTS_DIR, f"{rapport_id}.pdf")
 
     if not os.path.isfile(chemin_pdf):
@@ -123,6 +127,7 @@ async def supprimer_rapport(
     rapport_id: str,
     db: AsyncSession = Depends(get_db)
 ):
+    # Supprime le rapport de la base et les fichiers associés (json, html, pdf)
     resultat = await db.execute(
         select(RapportDB).where(RapportDB.id == rapport_id)
     )

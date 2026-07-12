@@ -23,6 +23,7 @@ POIDS = {
 
 
 def calculer_score(vulns) -> int:
+    # Score de 0 à 100 — chaque vulnérabilité retire des points selon sa sévérité
     penalite = 0
     for v in vulns:
         penalite += POIDS.get(v.severite.value, 0)
@@ -30,6 +31,7 @@ def calculer_score(vulns) -> int:
 
 
 def generer_resume(rapport: RapportAnalyse) -> str:
+    # Génère une phrase de synthèse lisible à partir des résultats de l'analyse
     if rapport.nb_vulnerabilites == 0:
         return "Aucune vulnérabilité détectée. Le code semble sûr."
 

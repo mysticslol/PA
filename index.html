@@ -822,7 +822,10 @@ async function exporterJSON() {
 }
 
 async function exporterPDF() {
-  if (!currentRapportId) { toast('Aucun rapport à exporter', 'error'); return; }
+  if (!currentRapportId) {
+    toast('Aucun rapport à exporter', 'error');
+    return;
+  }
   toast('Génération du PDF…');
   window.open(`${API}/api/rapports/${currentRapportId}/pdf`, '_blank');
 }

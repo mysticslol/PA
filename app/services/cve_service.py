@@ -8,6 +8,7 @@ index_cve: Optional[Dict] = None
 
 
 def lire_fichier_cve(data: dict) -> Optional[dict]:
+    # Extrait les informations utiles d'un fichier CVE au format CVElist V5
     try:
         meta     = data.get("cveMetadata", {})
         cve_id   = meta.get("cveId", "")
@@ -74,6 +75,7 @@ def lire_fichier_cve(data: dict) -> Optional[dict]:
 
 
 def charger_index() -> Dict:
+    # Parcourt le dossier CVE et charge toutes les entrées en mémoire (une seule fois)
     global index_cve
     if index_cve is not None:
         return index_cve
@@ -152,6 +154,7 @@ CWE_VERS_CATEGORIE = {
 
 
 def score_en_severite(score: Optional[float]) -> str:
+    # Convertit un score CVSS numérique en niveau de sévérité (standard CVSS v3.1)
     if score is None:
         return "inconnue"
     if score >= 9.0:
@@ -167,6 +170,7 @@ def corréler_cve(
     vulnerabilites: List[Vulnerabilite],
     langage: str,
 ) -> Tuple[List[Vulnerabilite], List[ResultatCVE]]:
+    # Relie chaque vulnérabilité détectée aux CVE correspondantes dans la base ANSSI
     index = charger_index()
     if not index:
         return vulnerabilites, []
